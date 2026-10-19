@@ -18,3 +18,7 @@ add_test(NAME core COMMAND test_core)
 add_executable(test_queue sim/tests/test_queue.cpp)
 target_link_libraries(test_queue PRIVATE mm)
 add_test(NAME queue COMMAND test_queue)
+
+add_executable(test_fill sim/tests/test_fill.cpp)
+target_link_libraries(test_fill PRIVATE mm)
+add_test(NAME fill COMMAND test_fill)

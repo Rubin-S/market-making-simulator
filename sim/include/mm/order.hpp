@@ -3,6 +3,7 @@
 //   Idle --submit--> PendingNew --arrive--> Resting --cancel--> PendingCancel
 //     ^                                       |                     |
 //     +------------- filled / cancel_done ----+---------------------+
+//   (PendingNew --rejected--> Idle when post-only would cross on arrival)
 //
 // After a fill or cancel, the strategy only learns about it one response
 // latency later (t_free). Until then the slot stays busy, so we can never
@@ -36,6 +37,10 @@ struct OrderSlot {
     }
     // The exchange receives the order; it starts resting in the book.
     void arrive() { if (st == State::PendingNew) st = State::Resting; }
+    // The exchange refuses the order on arrival (post-only would have crossed).
+    void rejected(Ts ts, Ts resp_lat) {
+        if (st == State::PendingNew) { st = State::Idle; t_free = ts + resp_lat; }
+    }
 
     // Ask to cancel. Only a resting order can be cancelled.
     bool cancel(Ts now, Ts entry_lat) {
