@@ -107,3 +107,10 @@ calibrate (dev) → Albers replication (dev) → arms + economics (dev) → READ
 
 ### Addendum A2 (2026-10-19, written before calibrate.py was run on any day)
 **Microprice fallback rule, fixed in code before seeing its output.** On BTCUSDT the mid can move several ticks between two depth updates, so Stoikov's Markov sum for G* may not settle. `research/calibrate.py` therefore reports G* with a convergence check (terms < 1e-6 within 200 iterations, and |G*| < 1 tick). If it converges, alpha = kappa x G*(I). If it does not, alpha = kappa x G_tau(I), where G_tau(I) = E[mid(t+1 s) - mid(t) | I] on the dev days, symmetrised. Either way kappa is the least-squares fit of the 1 s mid change, never P&L.
+
+### Addendum A3 (2026-10-19, data coverage, before any strategy arm or P&L)
+`research/check_bbo.py` shows each dev file covers **00:00:00 to 01:59:59 UTC only (2.00 h)**, not a full day. These are the windows the OFI project downloaded. The clock is healthy: median gap 52 ms (Apr/May) and 26-28 ms (Jun/Jul), max gap 5.8 s. So:
+- The sample is the **first 2 h UTC of each first-of-month day**: 8 h of dev, and 6 h of holdout if the holdout files match (checked by span only, before freeze).
+- All rates (lambda, sigma, P&L per hour) are per second of data, so the calibration stands unchanged (`config/calib_dev.json`, sha256 c296b6f0...).
+- Only the 00:00 UTC funding time falls inside the window, and the 60 s burn-in already covers it.
+- **Limitation, stated up front:** 00:00-02:00 UTC is mostly the Asian session. Results may not carry over to the US/EU hours. Full-day replication is pre-registered as v2.
