@@ -30,3 +30,7 @@ add_test(NAME markout COMMAND test_markout)
 # The simulator itself
 add_executable(mm_sim sim/src/mm_sim.cpp)
 target_link_libraries(mm_sim PRIVATE mm)
+
+# Compat mode: hftbacktest's machinery + our queue model and ledger (checked by oracle/run_compat.py)
+add_executable(mm_compat sim/src/mm_compat.cpp)
+target_link_libraries(mm_compat PRIVATE mm)
