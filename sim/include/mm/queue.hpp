@@ -8,6 +8,9 @@
 //   2. a cancel: we can't see WHO cancelled, so a rule splits it between
 //      ahead and behind. The rules are a bracket, from slowest to fastest:
 //        RiskAdverse  <=  Power3(2)  <=  Prorata = Power(1)  <=  Power2(2)
+//   Naive is a deliberately WRONG strawman (Crypto_MM / Hummingbot style):
+//   no queue at all, so any print at our price fills us. It shows how much
+//   ignoring the queue inflates results.
 //
 // Formulas copy hftbacktest's ProbQueueModel exactly (queue.rs 165-216),
 // including its quirk that `back` is read before trades are taken off,
@@ -19,13 +22,14 @@
 
 namespace mm {
 
-enum class QueueRule { RiskAdverse, Power3_2, Prorata, Power2_2 };
+enum class QueueRule { RiskAdverse, Power3_2, Prorata, Power2_2, Naive };
 
 // Probability that a cancel came from BEHIND us (so it does NOT help us).
 inline double p_behind(QueueRule r, double front, double back) {
     double p = 1.0;
     switch (r) {
-        case QueueRule::RiskAdverse: p = 1.0; break;                         // never from ahead
+        case QueueRule::RiskAdverse:
+        case QueueRule::Naive:       p = 1.0; break;                         // never from ahead
         case QueueRule::Power3_2: { double x = front / (front + back); p = 1.0 - x * x; break; }
         case QueueRule::Prorata:    p = back / (back + front); break;         // share of the line
         case QueueRule::Power2_2: { double x = back / (back + front); p = x * x; break; }
@@ -41,7 +45,8 @@ struct QueuePos {
 
     // Our order reaches the exchange: we join BEHIND everything visible.
     void join(Lot level_qty) {
-        front = static_cast<double>(level_qty); behind = 0; cum_trade = 0;
+        front = rule == QueueRule::Naive ? 0.0 : static_cast<double>(level_qty);   // Naive: no line
+        behind = 0; cum_trade = 0;
     }
 
     // A print of `qty` lots at exactly our price. Returns lots WE got filled (0 if none).
@@ -56,7 +61,9 @@ struct QueuePos {
     // The level size at our price changed from `prev` to `now` (exchange book).
     void on_depth(Lot prev, Lot now) {
         const double nq = static_cast<double>(now);
-        if (rule == QueueRule::RiskAdverse) {
+        if (rule == QueueRule::Naive) {
+            front = 0;                                  // always first in line
+        } else if (rule == QueueRule::RiskAdverse) {
             front = std::min(front, nq);                // only the clamp moves us
         } else {
             double chg = static_cast<double>(prev - now) - cum_trade;   // dedupe: prints already counted

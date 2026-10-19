@@ -75,9 +75,17 @@ static void q_back_quirk() {
     std::printf("q_back_quirk: front = %.4f (hftbacktest 6.067)\n", q.front);
 }
 
+// q_naive: the strawman ignores the 10 lots ahead; the first 1-lot print fills us.
+static void q_naive() {
+    QueuePos q{QueueRule::Naive}; q.join(10);
+    q.on_depth(10, 12);
+    CHECK(near(q.front, 0));
+    CHECK(q.on_trade(1) == 1);
+}
+
 int main() {
     q_fifo_basic(); q_dead_order(); q_dedupe_trade_first();
-    q_rules_bracket(); q_adds_behind(); q_back_quirk();
+    q_rules_bracket(); q_adds_behind(); q_back_quirk(); q_naive();
     if (failures) { std::fprintf(stderr, "%d check(s) FAILED\n", failures); return 1; }
     std::printf("all queue tests passed\n");
 }

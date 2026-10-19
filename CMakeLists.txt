@@ -22,3 +22,7 @@ add_test(NAME queue COMMAND test_queue)
 add_executable(test_fill sim/tests/test_fill.cpp)
 target_link_libraries(test_fill PRIVATE mm)
 add_test(NAME fill COMMAND test_fill)
+
+add_executable(test_markout sim/tests/test_markout.cpp)
+target_link_libraries(test_markout PRIVATE mm)
+add_test(NAME markout COMMAND test_markout)
