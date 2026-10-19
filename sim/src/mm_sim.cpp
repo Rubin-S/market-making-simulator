@@ -24,7 +24,10 @@
 // Hard cap: stop quoting the side that would push |position| past qmax.
 // The strategy only acts on market events, never on a response wake.
 //
-// Outputs in <out_dir>: fills.csv, events.csv, summary.json.
+// Outputs in <out_dir>: fills.csv, orders.csv, events.csv, summary.json.
+// orders.csv (Step 6): one row per order we sent, with the book when we sent it
+// (own-side imbalance, size at our price, mid) and how it ended (fill/cancel/
+// reject/open). fills.csv carries the order_id so the two can be joined.
 // usage: mm_sim <file.evt> <out_dir> [rule=prorata] [latency_ms=0] [qmax=10] [depth=0]
 //        rule: riskadverse | power3 | prorata | power2 | naive
 #include <algorithm>
@@ -73,7 +76,17 @@ static Lot qty_at(const ArrayBook& b, Side s, Tick px) {
     return 0;
 }
 
-struct RawFill { FillEvent f; Half mid_before; double qp; Lot pos_after; };
+struct RawFill { FillEvent f; Half mid_before; double qp; Lot pos_after; std::uint64_t id; };
+
+// One order we sent. Ids run 1, 2, 3, ... so order `id` lives at orders[id - 1].
+struct OrderRec {
+    std::uint64_t id; Side side; Tick px; Ts t_new;
+    Ts t_end = -1;            // exchange time it ended (-1 = still open at the data end)
+    char outcome = 'o';       // f = filled, c = cancelled, r = rejected (post-only), o = open
+    double imb_own;           // (own-side top size - other side) / (sum), at send. Bid: (B-A)/(B+A)
+    Lot q_size;               // size resting at our price when we sent (the line we join, roughly)
+    Half mid_new;             // mid when we sent, half ticks
+};
 
 struct Sim {
     MakerSide side[2];
@@ -88,6 +101,7 @@ struct Sim {
     std::deque<FillEvent> unheard;
     std::uint64_t next_id = 1, n_new = 0, n_cancel = 0;
     std::vector<RawFill> fills;
+    std::vector<OrderRec> orders;
     MidSeries mids;
     std::FILE* ev_fp;
 
@@ -103,9 +117,16 @@ struct Sim {
     void record(const std::optional<FillEvent>& f, double qp) {
         if (!f) return;
         pos += sign(f->side) * f->qty;
-        fills.push_back({*f, mid_before, qp, pos});
+        const std::uint64_t id = side[f->side == Side::Bid ? 0 : 1].slot().id;   // filled() keeps the id
+        fills.push_back({*f, mid_before, qp, pos, id});
         unheard.push_back(*f);
-        log("fill", f->side, f->px, side[f->side == Side::Bid ? 0 : 1].slot().id);
+        end_order(id, 'f', f->ts);
+        log("fill", f->side, f->px, id);
+    }
+
+    void end_order(std::uint64_t id, char how, Ts ts) {
+        OrderRec& o = orders[id - 1];
+        o.outcome = how; o.t_end = ts;
     }
 
     // ---- replay() callbacks ----
@@ -124,8 +145,11 @@ struct Sim {
                 const State st = o.slot().st;
                 const std::uint64_t rej = o.gtx_rejects();
                 o.process_msg(qty_at(b, o.side(), o.slot().px), bb, ba);
-                if (o.gtx_rejects() != rej) log("reject", o.side(), o.slot().px, o.slot().id);
-                else if (st == State::PendingCancel) log("cancel_done", o.side(), o.slot().px, o.slot().id);
+                if (o.gtx_rejects() != rej) {
+                    log("reject", o.side(), o.slot().px, o.slot().id); end_order(o.slot().id, 'r', t);
+                } else if (st == State::PendingCancel) {
+                    log("cancel_done", o.side(), o.slot().px, o.slot().id); end_order(o.slot().id, 'c', t);
+                }
             }
         }
         mid_before = mid_now;
@@ -173,7 +197,13 @@ struct Sim {
             if (o.slot().st == State::Resting && (o.slot().px != target || !allowed)) {
                 if (o.cancel(t)) { ++n_cancel; log("cancel", o.side(), o.slot().px, o.slot().id); }
             } else if (allowed && !o.busy(t)) {
-                if (o.quote(next_id, target, 1, t)) { log("new", o.side(), target, next_id); ++next_id; ++n_new; }
+                if (o.quote(next_id, target, 1, t)) {
+                    const double own = static_cast<double>(is_bid ? bb.qty : ba.qty);
+                    const double oth = static_cast<double>(is_bid ? ba.qty : bb.qty);
+                    orders.push_back({next_id, o.side(), target, t, -1, 'o', (own - oth) / (own + oth),
+                                      qty_at(b, o.side(), target), static_cast<Half>(bb.px + ba.px)});
+                    log("new", o.side(), target, next_id); ++next_id; ++n_new;
+                }
             }
         }
     }
@@ -221,7 +251,7 @@ int main(int argc, char** argv) {
         Ledger L(0.0002, 0.0005);                                // VIP 0: 2 bp maker, 5 bp taker
         std::FILE* fp = std::fopen((out + "/fills.csv").c_str(), "w");
         std::fprintf(fp, "ts_exch_us,side,px_tick,qty_lot,src,qp_before,mid_before_half,"
-                         "mid_100ms_half,mid_1s_half,mid_5s_half,mid_30s_half,pos_after,masked\n");
+                         "mid_100ms_half,mid_1s_half,mid_5s_half,mid_30s_half,pos_after,masked,order_id\n");
         std::uint64_t by_src[3] = {0, 0, 0}, n_kept = 0;   // n_kept: fills outside the funding mask
         for (const RawFill& r : sim.fills) {
             Half mt[4]; bool ok[4];
@@ -235,13 +265,27 @@ int main(int argc, char** argv) {
             for (int h = 0; h < 4; ++h) {
                 if (ok[h]) std::fprintf(fp, ",%lld", (long long)mt[h]); else std::fprintf(fp, ",");
             }
-            std::fprintf(fp, ",%lld,%d\n", (long long)r.pos_after, in_funding(r.f.ts) ? 1 : 0);
+            std::fprintf(fp, ",%lld,%d,%llu\n", (long long)r.pos_after, in_funding(r.f.ts) ? 1 : 0,
+                         (unsigned long long)r.id);
             if (!in_funding(r.f.ts)) ++n_kept;
             ++by_src[static_cast<int>(r.f.src)];
             // ledger: tau = 1 s; past the data end, use the final mid (that fill's markout+inventory = M - mid)
             L.add({r.f.ts, r.f.side, r.f.px, r.f.qty, true, r.mid_before, ok[kTauLedger] ? mt[kTauLedger] : M});
         }
         std::fclose(fp);
+
+        // orders.csv: mid 5 s after we sent (blank if past the data end), for P(fill | 5 s return)
+        std::FILE* op = std::fopen((out + "/orders.csv").c_str(), "w");
+        std::fprintf(op, "order_id,side,px_tick,t_new_us,t_end_us,outcome,imb_own,q_size_lot,"
+                         "mid_new_half,mid_5s_half,masked\n");
+        for (const OrderRec& o : sim.orders) {
+            std::fprintf(op, "%llu,%s,%lld,%lld,%lld,%c,%.6f,%lld,%lld,", (unsigned long long)o.id,
+                         o.side == Side::Bid ? "bid" : "ask", (long long)o.px, (long long)o.t_new,
+                         (long long)o.t_end, o.outcome, o.imb_own, (long long)o.q_size, (long long)o.mid_new);
+            if (o.t_new + kHorizon[2] <= t_end) std::fprintf(op, "%lld", (long long)*sim.mids.asof(o.t_new + kHorizon[2]));
+            std::fprintf(op, ",%d\n", in_funding(o.t_new) ? 1 : 0);
+        }
+        std::fclose(op);
 
         const PnlParts p = L.split(M);
         const double n_ev = static_cast<double>(f.events().size());

@@ -1,0 +1,17 @@
+rule,horizon,n,mean_drift_ticks
+riskadverse,100ms,27944,-37.876
+riskadverse,1s,27944,-54.384
+riskadverse,5s,27936,-62.821
+riskadverse,30s,27873,-66.927
+power3,100ms,28443,-37.26
+power3,1s,28443,-53.56
+power3,5s,28434,-62.037
+power3,30s,28369,-66.262
+prorata,100ms,30035,-35.258
+prorata,1s,30035,-51.253
+prorata,5s,30021,-59.577
+prorata,30s,29958,-64.177
+power2,100ms,32447,-32.596
+power2,1s,32447,-48.344
+power2,5s,32432,-56.691
+power2,30s,32357,-61.397
