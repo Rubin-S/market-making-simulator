@@ -93,3 +93,14 @@ z_b = (h − ½) + s·q − α̂ for the bid and z_a = (h − ½) − s·q + α�
 
 ### Order of work after this tag
 calibrate (dev) → Albers replication (dev) → arms + economics (dev) → README addendum + `freeze-v1` → holdout **once** → `holdout-v1` → write-up → `v1.0`.
+
+### Addendum A1 (2026-10-19, before any strategy arm or P&L)
+**What we had seen:** only the dev probe intensities in `results/probes_dev.csv` (Step 5a). No arm run, no P&L, no markouts.
+
+**Evidence:** at the headline (Prorata, 10 ms), pooled over the 4 dev days, lambda = 0.781 / 0.611 / 0.591 fills per resting second at 0 / 1 / 2 ticks behind best. The decay is k01 = ln(l0/l1) = 0.245 per tick but k12 = 0.033, about 7x flatter, under every queue rule and latency. The exponential intensity A e^(-k d) behind GLFT does not fit this one-tick-spread market. With k = 0.245, GLFT's half-spread is about 1/k = 4 ticks, so Rule A would skip both sides almost always.
+
+**Change:**
+- **S1 GLFT stays exactly as pre-registered** and is reported. If it barely quotes, that is a result.
+- **New quote rule, Rule T (touch-anchored GLFT):** z_b = s*q - alpha, z_a = -s*q + alpha, with the same thresholds (0.5 / 1.5), hysteresis and Q_max. s is GLFT's skew, computed with A = l0 and k = k01 from the probes. When flat, it quotes at the touch. Inventory and the imbalance tilt move it back.
+- **New arm S1t** = Rule T with alpha = 0. **S2, S3 and S3r now use Rule T.** gamma is chosen as before (inventory rule, never P&L).
+- **New hypothesis H-C1:** on the holdout probes (Prorata, 10 ms), k12 < 0.5 x k01. Exponential decay would give k12 = k01.
