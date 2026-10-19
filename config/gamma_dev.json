@@ -1,0 +1,174 @@
+{
+  "rule": "smallest gamma with time-weighted p99 |q| <= Q_max (Addendum A4)",
+  "arm": "s1t",
+  "queue_rule": "prorata",
+  "latency_ms": 10,
+  "qmax_lots": 10,
+  "cap_during_selection": "lifted (1e6)",
+  "calib_sha256": "c296b6f03459bf188dbc8d7f77424e0c0577cdf43845920e507c6d8176c96322",
+  "gamma": 1e-06,
+  "skew_ticks_per_lot": 0.154517,
+  "q99_lots": 10,
+  "grid": [
+    {
+      "gamma": 1e-08,
+      "skew_ticks_per_lot": 0.015452,
+      "lean_back_at_lots": 32.35827077400984,
+      "stop_side_at_lots": 97.0748123220295,
+      "q50": 33,
+      "q90": 70,
+      "q99": 97,
+      "q_max_seen": 98
+    },
+    {
+      "gamma": 2.1544346900318822e-08,
+      "skew_ticks_per_lot": 0.02268,
+      "lean_back_at_lots": 22.045855379188712,
+      "stop_side_at_lots": 66.13756613756614,
+      "q50": 23,
+      "q90": 52,
+      "q99": 67,
+      "q_max_seen": 67
+    },
+    {
+      "gamma": 4.641588833612782e-08,
+      "skew_ticks_per_lot": 0.03329,
+      "lean_back_at_lots": 15.019525382997898,
+      "stop_side_at_lots": 45.058576148993694,
+      "q50": 18,
+      "q90": 40,
+      "q99": 46,
+      "q_max_seen": 46
+    },
+    {
+      "gamma": 1e-07,
+      "skew_ticks_per_lot": 0.048862,
+      "lean_back_at_lots": 10.232900822725226,
+      "stop_side_at_lots": 30.698702468175675,
+      "q50": 14,
+      "q90": 29,
+      "q99": 31,
+      "q_max_seen": 31
+    },
+    {
+      "gamma": 2.1544346900318822e-07,
+      "skew_ticks_per_lot": 0.07172,
+      "lean_back_at_lots": 6.971556051310652,
+      "stop_side_at_lots": 20.914668153931956,
+      "q50": 10,
+      "q90": 21,
+      "q99": 21,
+      "q_max_seen": 21
+    },
+    {
+      "gamma": 4.641588833612782e-07,
+      "skew_ticks_per_lot": 0.105271,
+      "lean_back_at_lots": 4.749646151361723,
+      "stop_side_at_lots": 14.24893845408517,
+      "q50": 8,
+      "q90": 15,
+      "q99": 15,
+      "q_max_seen": 15
+    },
+    {
+      "gamma": 1e-06,
+      "skew_ticks_per_lot": 0.154517,
+      "lean_back_at_lots": 3.235889902081972,
+      "stop_side_at_lots": 9.707669706245916,
+      "q50": 6,
+      "q90": 10,
+      "q99": 10,
+      "q_max_seen": 10
+    },
+    {
+      "gamma": 2.1544346900318865e-06,
+      "skew_ticks_per_lot": 0.2268,
+      "lean_back_at_lots": 2.204585537918871,
+      "stop_side_at_lots": 6.613756613756614,
+      "q50": 5,
+      "q90": 7,
+      "q99": 7,
+      "q_max_seen": 7
+    },
+    {
+      "gamma": 4.641588833612773e-06,
+      "skew_ticks_per_lot": 0.332897,
+      "lean_back_at_lots": 1.5019660735903297,
+      "stop_side_at_lots": 4.505898220770989,
+      "q50": 4,
+      "q90": 5,
+      "q99": 5,
+      "q_max_seen": 5
+    },
+    {
+      "gamma": 1e-05,
+      "skew_ticks_per_lot": 0.488629,
+      "lean_back_at_lots": 1.023271234413021,
+      "stop_side_at_lots": 3.069813703239063,
+      "q50": 3,
+      "q90": 4,
+      "q99": 4,
+      "q_max_seen": 4
+    },
+    {
+      "gamma": 2.1544346900318867e-05,
+      "skew_ticks_per_lot": 0.717217,
+      "lean_back_at_lots": 0.697139080640866,
+      "stop_side_at_lots": 2.0914172419225983,
+      "q50": 3,
+      "q90": 3,
+      "q99": 3,
+      "q_max_seen": 3
+    },
+    {
+      "gamma": 4.641588833612772e-05,
+      "skew_ticks_per_lot": 1.052758,
+      "lean_back_at_lots": 0.47494295935058195,
+      "stop_side_at_lots": 1.424828878051746,
+      "q50": 2,
+      "q90": 2,
+      "q99": 2,
+      "q_max_seen": 2
+    },
+    {
+      "gamma": 0.0001,
+      "skew_ticks_per_lot": 1.545321,
+      "lean_back_at_lots": 0.3235573709281114,
+      "stop_side_at_lots": 0.9706721127843342,
+      "q50": 1,
+      "q90": 1,
+      "q99": 1,
+      "q_max_seen": 1
+    },
+    {
+      "gamma": 0.00021544346900318823,
+      "skew_ticks_per_lot": 2.268489,
+      "lean_back_at_lots": 0.22041103130762368,
+      "stop_side_at_lots": 0.6612330939228711,
+      "q50": 1,
+      "q90": 1,
+      "q99": 1,
+      "q_max_seen": 1
+    },
+    {
+      "gamma": 0.0004641588833612782,
+      "skew_ticks_per_lot": 3.33053,
+      "lean_back_at_lots": 0.1501262561814486,
+      "stop_side_at_lots": 0.4503787685443458,
+      "q50": 1,
+      "q90": 1,
+      "q99": 1,
+      "q_max_seen": 1
+    },
+    {
+      "gamma": 0.001,
+      "skew_ticks_per_lot": 4.891218,
+      "lean_back_at_lots": 0.10222402681704229,
+      "stop_side_at_lots": 0.30667208045112687,
+      "q50": 1,
+      "q90": 1,
+      "q99": 1,
+      "q_max_seen": 1
+    }
+  ]
+}
