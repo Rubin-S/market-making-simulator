@@ -14,6 +14,7 @@ profitable is decided by the fill model, not the strategy.**
 - **8 of 11** pre-registered hypotheses confirmed on the holdout. The mechanics replicate; the one strategy edge seen on dev (S3, fading imbalance) does not.
 - Every run's P&L splits exactly into spread capture + markout + inventory − fees (198/198 holdout runs, 264/264 dev).
 - Honest post-mortem written before this section: [`POSTMORTEM.md`](POSTMORTEM.md).
+- Plain-words guide to the theory, with interview Q&A: [`LEARNING.md`](LEARNING.md).
 
 | | |
 |---|---|
