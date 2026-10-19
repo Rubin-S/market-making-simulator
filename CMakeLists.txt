@@ -14,3 +14,7 @@ enable_testing()
 add_executable(test_core sim/tests/test_core.cpp)
 target_link_libraries(test_core PRIVATE mm)
 add_test(NAME core COMMAND test_core)
+
+add_executable(test_queue sim/tests/test_queue.cpp)
+target_link_libraries(test_queue PRIVATE mm)
+add_test(NAME queue COMMAND test_queue)
