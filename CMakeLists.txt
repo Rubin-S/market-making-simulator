@@ -34,3 +34,8 @@ target_link_libraries(mm_sim PRIVATE mm)
 # Compat mode: hftbacktest's machinery + our queue model and ledger (checked by oracle/run_compat.py)
 add_executable(mm_compat sim/src/mm_compat.cpp)
 target_link_libraries(mm_compat PRIVATE mm)
+
+# Top-of-book dump on the mm_sim clock (read by research/calibrate.py)
+add_executable(mm_bbo sim/src/mm_bbo.cpp)
+target_link_libraries(mm_bbo PRIVATE mm)
+

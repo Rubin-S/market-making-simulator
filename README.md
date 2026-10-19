@@ -104,3 +104,6 @@ calibrate (dev) → Albers replication (dev) → arms + economics (dev) → READ
 - **New quote rule, Rule T (touch-anchored GLFT):** z_b = s*q - alpha, z_a = -s*q + alpha, with the same thresholds (0.5 / 1.5), hysteresis and Q_max. s is GLFT's skew, computed with A = l0 and k = k01 from the probes. When flat, it quotes at the touch. Inventory and the imbalance tilt move it back.
 - **New arm S1t** = Rule T with alpha = 0. **S2, S3 and S3r now use Rule T.** gamma is chosen as before (inventory rule, never P&L).
 - **New hypothesis H-C1:** on the holdout probes (Prorata, 10 ms), k12 < 0.5 x k01. Exponential decay would give k12 = k01.
+
+### Addendum A2 (2026-10-19, written before calibrate.py was run on any day)
+**Microprice fallback rule, fixed in code before seeing its output.** On BTCUSDT the mid can move several ticks between two depth updates, so Stoikov's Markov sum for G* may not settle. `research/calibrate.py` therefore reports G* with a convergence check (terms < 1e-6 within 200 iterations, and |G*| < 1 tick). If it converges, alpha = kappa x G*(I). If it does not, alpha = kappa x G_tau(I), where G_tau(I) = E[mid(t+1 s) - mid(t) | I] on the dev days, symmetrised. Either way kappa is the least-squares fit of the 1 s mid change, never P&L.
