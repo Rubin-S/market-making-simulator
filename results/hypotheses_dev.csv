@@ -1,4 +1,4 @@
-hypothesis,test,estimate,ci_lo,ci_hi,day_ci_lo,day_ci_hi,predicted,dev_preview,p_one_sided,note
+hypothesis,test,estimate,ci_lo,ci_hi,day_ci_lo,day_ci_hi,predicted,verdict,p_one_sided,note
 H-Q3e,S0 f* (bp),-0.7975,-0.8437,-0.7565,-0.8582,-0.6347,< 0,on predicted side,0.0,
 H-Q4a,S2 - S0 net VIP-0 per fill (bp),-0.1187,-0.4603,0.2757,-0.1925,0.113,< 0,not shown,0.28,
 H-Q4c(i),S3 - S3r net per fill (bp),0.1812,0.0914,0.2577,0.1391,0.2125,> 0.1,not shown,0.037,

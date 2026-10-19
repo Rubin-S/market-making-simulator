@@ -1,4 +1,4 @@
-"""Step 8: economics of every arm on the DEV days, with bootstrap CIs (README "Statistics" + Addendum A6).
+"""Step 8: economics of every arm on the DEV days (holdout with --holdout, Addendum A7), with bootstrap CIs (README "Statistics" + Addendum A6).
 Reads the runs research/run_arms.py left in build/arms/ (each needs pnl_min.csv, fills.csv, inv_hist.csv).
 
 Unit = one minute of one day (pnl_min.csv rows). For each unit: fills, notional, spread capture (SC),
@@ -8,8 +8,8 @@ Primary CI: 5-minute moving-block bootstrap = blocks of 5 consecutive minutes, s
 resampled within each day to that day's length; 2,000 resamples, seed 20261020; the SAME draws are used
 for every run, so differences between arms are paired. Also shown: day-block bootstrap (resample days).
 Per-fill numbers are bp of notional. Fee tiers: VIP-0 = +2 bp, 0 fee, -0.5 bp rebate (per fill side).
-Outputs: results/economics_dev.csv (per arm x rule x latency), results/hypotheses_dev.csv (headline).
-DEV ONLY: "confirmed" is decided on the holdout. Here it is a preview.
+Outputs: results/economics_<tag>.csv (per arm x rule x latency), results/hypotheses_<tag>.csv (headline).
+On dev the verdict is a preview; "confirmed" is decided only on the holdout.
 Usage (repo root): .venv/bin/python research/economics.py"""
 import bisect, csv, glob, json, os, re, sys
 from collections import defaultdict
@@ -23,7 +23,11 @@ F, NOT, SC, MO, INV, FEE = range(6)                # columns of a unit array
 
 runs = defaultdict(dict)                            # (arm, rule, lat) -> day -> (units x 6) array
 eq2 = defaultdict(lambda: [0.0, 0.0])               # (arm, rule, lat) -> [sum q^2 * s, sum s]
+from days import split
+DAYS_RUN, TAG = split()
 for d in sorted(glob.glob('build/arms/2026*_*')):
+    if os.path.basename(d)[:8] not in DAYS_RUN:
+        continue
     m = re.match(r'.*/(\d{8})_(\w+?)_(riskadverse|prorata|power2|naive)_(\d+)ms$', d)
     day, arm, rule, lat = m.group(1), m.group(2), m.group(3), int(m.group(4))
     rows = list(csv.DictReader(open(f'{d}/pnl_min.csv')))
@@ -124,7 +128,7 @@ for key in sorted(runs, key=lambda k: (k[0], k[1], k[2])):
              max_dd_usdt=round(dd, 4), mean_q2_lots2=round(eq2[key][0] / eq2[key][1], 2))
     rows.append(r)
 os.makedirs('results', exist_ok=True)
-with open('results/economics_dev.csv', 'w', newline='') as f:
+with open(f'results/economics_{TAG}.csv', 'w', newline='') as f:
     w = csv.DictWriter(f, fieldnames=list(rows[0])); w.writeheader(); w.writerows(rows)
 
 # ---- hypotheses at the headline (prorata, 10 ms); dev preview ----
@@ -136,11 +140,14 @@ def get(arm, m, rule='prorata', lat=10):
 def hyp(name, desc, pt, bs, ds, side, thr=0.0, note=''):
     lo, hi = ci(bs); dlo, dhi = ci(ds)
     ok = lo > thr if side == '>' else hi < thr
-    verdict = 'not testable' if 'not testable' in note else 'on predicted side' if ok else 'not shown'
+    if TAG == 'holdout':
+        verdict = 'not testable' if 'not testable' in note else 'confirmed' if ok else 'not confirmed'
+    else:
+        verdict = 'not testable' if 'not testable' in note else 'on predicted side' if ok else 'not shown'
     p = float(np.mean(bs <= thr)) if side == '>' else float(np.mean(bs >= thr))
     return dict(hypothesis=name, test=desc, estimate=round(float(pt), 4), ci_lo=round(lo, 4), ci_hi=round(hi, 4),
                 day_ci_lo=round(dlo, 4), day_ci_hi=round(dhi, 4), predicted=f'{side} {thr:g}',
-                dev_preview=verdict, p_one_sided=round(p, 4), note=note)
+                verdict=verdict, p_one_sided=round(p, 4), note=note)
 
 
 H = []
@@ -162,11 +169,11 @@ for arm in ['s1', 's1t', 's2', 's3']:
     d = [x - y for x, y in zip(cut(arm), cut('s0'))]
     H.append(hyp(f'H-L1 {arm}', f'cut(0->50 ms, USDT/h): {arm} - S0', *d, '>',
                  note='S1 never quotes (0 fills): not testable' if arm == 's1' else ''))
-with open('results/hypotheses_dev.csv', 'w', newline='') as f:
+with open(f'results/hypotheses_{TAG}.csv', 'w', newline='') as f:
     w = csv.DictWriter(f, fieldnames=list(H[0])); w.writeheader(); w.writerows(H)
 
 # ---- print ----
-print(f'\nprorata 10 ms (strawman: naive 10 ms), 4 dev days, 95% CI = 5-min moving-block bootstrap ({B}x)')
+print(f'\nprorata 10 ms (strawman: naive 10 ms), {len(DAYS)} {TAG} days, 95% CI = 5-min moving-block bootstrap ({B}x)')
 print(f"{'arm':9s} {'fills/h':>8s} {'f* bp [CI]':>24s} {'net VIP0 bp [CI]':>26s} {'net -0.5bp':>11s} "
       f"{'gross USDT/h [CI]':>27s} {'Sharpe/h':>8s} {'maxDD':>7s} {'E[q2]':>6s}")
 for r in rows:
@@ -175,9 +182,10 @@ for r in rows:
               f"{r['net_vip0']:8.3f} [{r['net_vip0_lo']:7.3f},{r['net_vip0_hi']:7.3f}] {r['net_rebate']:11.3f} "
               f"{r['gross_h']:8.2f} [{r['gross_h_lo']:7.2f},{r['gross_h_hi']:7.2f}] {r['sharpe_hourly']:8.2f} "
               f"{r['max_dd_usdt']:7.2f} {r['mean_q2_lots2']:6.1f}")
-print(f"\n{'hypothesis':12s} {'test':38s} {'est':>8s} {'95% CI':>19s} {'day CI':>19s} {'pred':>6s} {'p':>6s}  dev preview")
+print(f"\n{'hypothesis':12s} {'test':38s} {'est':>8s} {'95% CI':>19s} {'day CI':>19s} {'pred':>6s} {'p':>6s}  verdict ({TAG})")
 for h in H:
     print(f"{h['hypothesis']:12s} {h['test']:38s} {h['estimate']:8.3f} [{h['ci_lo']:7.3f},{h['ci_hi']:7.3f}] "
           f"[{h['day_ci_lo']:7.3f},{h['day_ci_hi']:7.3f}] {h['predicted']:>6s} {h['p_one_sided']:6.3f}  "
-          f"{h['dev_preview']} {h['note']}")
-print('\nwrote results/economics_dev.csv, results/hypotheses_dev.csv  (DEV preview; confirmed only on the holdout)')
+          f"{h['verdict']} {h['note']}")
+print(f'\nwrote results/economics_{TAG}.csv, results/hypotheses_{TAG}.csv' +
+      ('' if TAG == 'holdout' else '  (DEV preview; confirmed only on the holdout)'))

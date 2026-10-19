@@ -1,4 +1,4 @@
-"""Step 6: replicate the Albers et al. live Binance touch-quoting facts in our simulator (DEV days only).
+"""Step 6: replicate the Albers et al. live Binance touch-quoting facts in our simulator (DEV days; holdout with --holdout, Addendum A7).
 Strategy: S0 naive touch (1 lot each side at best, cancel only when the touch moves, qmax 10).
 Grid: 4 dev days x 4 queue rules x 10 ms round trip (the pre-registered headline latency) = 16 runs.
 Every number is POOLED over the 4 days. Orders sent inside a funding window and masked fills are dropped.
@@ -23,14 +23,15 @@ Usage (repo root): .venv/bin/python research/albers.py"""
 import csv, json, os, subprocess, sys
 from collections import defaultdict
 
-DEV = ['20260401', '20260501', '20260601', '20260701']
+from days import split
+DAYS, TAG = split()
 RULES = ['riskadverse', 'power3', 'prorata', 'power2']
 LAT, QMAX = 10, 10
 HEADLINE = 'prorata'
 MIN_CELL = 30
 USDT_PER_TICK_LOT = 0.1 * 0.001
 
-for d in DEV:
+for d in DAYS:
     if not os.path.exists(f'data/{d}.evt'):
         sys.exit(f'missing data/{d}.evt')
 os.makedirs('results', exist_ok=True)
@@ -51,7 +52,7 @@ def ols(x, y):                                   # slope and R^2 of y = a + b x
 
 # ---- 1. run S0 and collect orders + fills ----
 orders, fills, gross, notional = defaultdict(list), defaultdict(list), defaultdict(float), defaultdict(float)
-for day in DEV:
+for day in DAYS:
     for rule in RULES:
         out = f'build/albers/{day}_{rule}'
         subprocess.run(['build/mm_sim', f'data/{day}.evt', out, rule, str(LAT), str(QMAX), '0'],
@@ -138,13 +139,13 @@ for rule in RULES:
                      gross_per_fill_bp=round(gross_bp, 4), round_trip_bp_before_fees=round(2 * gross_bp, 4),
                      round_trip_bp_vip0=round(2 * gross_bp - 4.0, 4)))
 
-for name, data in (('albers_dev.csv', rows), ('albers_table1_dev.csv', table1), ('albers_drift_dev.csv', drift)):
+for name, data in ((f'albers_{TAG}.csv', rows), (f'albers_table1_{TAG}.csv', table1), (f'albers_drift_{TAG}.csv', drift)):
     with open(f'results/{name}', 'w', newline='') as f:
         w = csv.DictWriter(f, fieldnames=list(data[0]))
         w.writeheader(); w.writerows(data)
 
 # ---- 3. print ----
-print(f'\nS0 touch, {LAT} ms round trip, qmax {QMAX}, 4 dev days pooled')
+print(f'\nS0 touch, {LAT} ms round trip, qmax {QMAX}, {len(DAYS)} {TAG} days pooled')
 print(f"{'rule':12s} {'fill%':>6s} {'slope':>7s} {'R2':>5s} {'P|r<0':>6s} {'P|r>0':>6s} {'mo1s bp':>8s} "
       f"{'gross/fill':>10s} {'RT bp':>7s} {'RT VIP0':>8s}")
 for r in rows:
@@ -183,4 +184,4 @@ print(f'  H-Q3c across all 4 rules: {"all agree" if agree else "model-dependent"
       f'({", ".join(r for r, v in front_beats_back.items() if v) or "none"} front > back)')
 gate = 0.45 <= h['fill_rate'] <= 0.65 and h['imb_slope'] < 0
 print(f'\nROADMAP GATE (fill rate 45-65% and slope < 0): {"PASS, go to Step 7" if gate else "FAIL, debug the engine first"}')
-print('wrote results/albers_dev.csv, albers_table1_dev.csv, albers_drift_dev.csv')
+print(f'wrote results/albers_{TAG}.csv, albers_table1_{TAG}.csv, albers_drift_{TAG}.csv')

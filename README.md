@@ -137,3 +137,14 @@ calibrate (dev) → Albers replication (dev) → arms + economics (dev) → READ
 - **Per hour** = minutes after burn-in / 60 (funding minutes included, as they are in total P&L). **Sharpe** = mean / sd of 1-minute net VIP-0 P&L × √60 (hourly; never annualised from a 2-hour Asian-session window). **Max drawdown** = worst intraday drop of net VIP-0 equity at 1-minute resolution. **Inventory** = time-weighted mean q² (lots²) from `inv_hist.csv`.
 - **H-L1 test:** cut(arm) = gross USDT/h at 0 ms − gross USDT/h at 50 ms. Predicted: cut(arm) − cut(S0) > 0 for S1, S1t, S2 and S3. S1 never quotes, so it is reported as not testable.
 - **Holm** adjustment across all 10 hypotheses is computed once, in the holdout report. Dev output is labelled a preview and is never used to confirm anything.
+### Addendum A7: freeze-v1 (2026-10-19, after every dev result, before any holdout run)
+**What we had seen:** all dev results, including the CIs in `results/economics_dev.csv` and `results/hypotheses_dev.csv` (Step 8, commit 83f2b53) and the dev preview in `results/verdicts_dev.csv`. No holdout day has been run.
+- **Frozen:** engine bd7882f, `config/calib_dev.json` (sha256 c296b6f0…), `config/gamma_dev.json` (sha256 88ea8552…, γ = 1e-6), every arm and its parameters, the headline (Prorata, 10 ms, Tier A), the 5 fill rules, the 0/10/50 ms ladder, and fees. Nothing is recalibrated on the holdout.
+- **Holdout days:** 2026-08-01, 2026-09-01, 2026-10-01, each 00:00–02:00 UTC (6 h). Run once, in this order: `run_probes.py`, `albers.py`, `run_arms.py`, `markouts.py`, `economics.py`, `verdicts.py`, all with `--holdout`. The scripts refuse to start unless freeze-v1 is in the checkout and the code is committed.
+- **Verdicts (`research/verdicts.py`):** every hypothesis gets a 95% CI from the A6 bootstrap (orders count in the minute they were sent, fills in the minute they happened). Confirmed = the CI is on the predicted side. A hypothesis with several parts needs all of them, and its p is the largest part p. Holm runs over 11 hypotheses (the 10 in the README + H-C1).
+  - H-Q1a = headline fill rate inside [0.45, 0.65] **and** riskadverse − power2 < 0.
+  - H-Q3c is labelled model-dependent unless large-queue front − back > 0 holds on all 4 rules.
+  - H-Q3d = the largest mean 1 s markout over the cells with n ≥ 30 is < 0.
+  - H-C1 = k12 − 0.5·k01 < 0, with probe resting time spread evenly over minutes.
+- **H-L1 parts are S1t, S2 and S3.** S1 never quotes and is reported as not testable. S1t is Addendum A1's touch-anchored stand-in for S1. Known weakness, written down before the holdout: H-L1 is measured in USDT per hour, so an arm with few fills "passes" just by losing little. It is reported as written, and its weakness is discussed in the write-up.
+- **S3m (A5)** is reported beside S3r and kept out of Holm. Any fix after the holdout is a v2 pre-registration on new days, never an edit to v1.

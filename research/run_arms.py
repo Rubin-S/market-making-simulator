@@ -1,4 +1,4 @@
-"""Step 7: run every arm on the DEV days and check the P&L split adds up on every run.
+"""Step 7: run every arm on the DEV days (holdout with --holdout, Addendum A7) and check the P&L split adds up on every run.
 Grid (README + Addenda A1, A4):
   arms     S0 naive touch, S1 GLFT (Rule A), S1t / S2 / S3 / S3r / S3m (Rule T; S3m = Addendum A5)
   rules    riskadverse (conservative bound), prorata (headline), power2 (optimistic bound)
@@ -19,7 +19,8 @@ from concurrent.futures import ThreadPoolExecutor
 sys.path.insert(0, os.path.dirname(__file__))
 from arm_params import CALIB, write_params
 
-DEV = ['20260401', '20260501', '20260601', '20260701']
+from days import split
+DAYS, TAG = split()
 ARMS = ['s0', 's1', 's1t', 's2', 's3', 's3r', 's3m']
 RULES = ['riskadverse', 'prorata', 'power2']
 LATS = [0, 10, 50]
@@ -27,7 +28,7 @@ QMAX = 10
 USDT_PER_TICK_LOT = 0.1 * 0.001
 EPS = 1e-9
 
-for d in DEV:
+for d in DAYS:
     if not os.path.exists(f'data/{d}.evt'):
         sys.exit(f'missing data/{d}.evt')
 calib = json.load(open(CALIB))
@@ -35,8 +36,8 @@ GAMMA = json.load(open('config/gamma_dev.json'))['gamma']
 os.makedirs('build/arms/params', exist_ok=True)
 os.makedirs('results', exist_ok=True)
 
-jobs = [(d, a, r, l) for d in DEV for a in ARMS for r in RULES for l in LATS] + \
-       [(d, 'strawman', 'naive', l) for d in DEV for l in LATS]
+jobs = [(d, a, r, l) for d in DAYS for a in ARMS for r in RULES for l in LATS] + \
+       [(d, 'strawman', 'naive', l) for d in DAYS for l in LATS]
 
 
 def run(job):
@@ -68,7 +69,7 @@ with ThreadPoolExecutor(max_workers=JOBS) as ex:
         if i % 12 == 0 or i == len(jobs):
             print(f'{i}/{len(jobs)} runs done', flush=True)
 
-with open('results/arms_runs_dev.csv', 'w', newline='') as f:
+with open(f'results/arms_runs_{TAG}.csv', 'w', newline='') as f:
     w = csv.DictWriter(f, fieldnames=list(runs[0]))
     w.writeheader(); w.writerows(runs)
 
@@ -98,14 +99,14 @@ for (arm, rule, lat), P in pool.items():
                      net_vip0_usdt_per_hour=round(P['total'] / P['hours'], 4), q_abs_p99_max=int(P['q_abs_p99_max'])))
 order = {a: i for i, a in enumerate(ARMS + ['strawman'])}
 rows.sort(key=lambda r: (order[r['arm']], r['rule'], r['latency_ms']))
-with open('results/arms_dev.csv', 'w', newline='') as f:
+with open(f'results/arms_{TAG}.csv', 'w', newline='') as f:
     w = csv.DictWriter(f, fieldnames=list(rows[0]))
     w.writeheader(); w.writerows(rows)
 
 # ---- print ----
 bad = [r for r in runs if not r['split_ok']]
 print(f'\nP&L split exact on {len(runs) - len(bad)}/{len(runs)} runs' + ('' if not bad else f'  FAILED: {bad[:3]}'))
-print(f'gamma = {GAMMA:.3e} (config/gamma_dev.json), Q_max = {QMAX}, 4 dev days pooled, bp of notional\n')
+print(f'gamma = {GAMMA:.3e} (config/gamma_dev.json), Q_max = {QMAX}, {len(DAYS)} {TAG} days pooled, bp of notional\n')
 hdr = f"{'arm':9s} {'rule':11s} {'lat':>3s} {'fills':>7s} {'fills/h':>8s} {'fill%':>6s} {'SC':>7s} {'MO1s':>7s} " \
       f"{'INV':>7s} {'gross':>7s} {'f*':>7s} {'netVIP0':>8s} {'p99|q|':>6s}"
 print(hdr)
@@ -115,6 +116,6 @@ for r in rows:
         print(f"{r['arm']:9s} {r['rule']:11s} {r['latency_ms']:3d} {r['fills']:7d} {r['fills_per_hour']:8.1f} "
               f"{(r['fill_rate'] if r['fill_rate'] != '' else 0):6.3f} {c('sc_bp')} {c('mo1s_bp')} {c('inv_bp')} "
               f"{c('gross_bp')} {c('f_star_bp')} {c('net_vip0_bp', 8)} {r['q_abs_p99_max']:6d}")
-print('\n(shown: every prorata/naive row + every 10 ms row; the full grid is in results/arms_dev.csv)')
-print('wrote results/arms_runs_dev.csv, results/arms_dev.csv')
+print(f'\n(shown: every prorata/naive row + every 10 ms row; the full grid is in results/arms_{TAG}.csv)')
+print(f'wrote results/arms_runs_{TAG}.csv, results/arms_{TAG}.csv')
 sys.exit(1 if bad else 0)
