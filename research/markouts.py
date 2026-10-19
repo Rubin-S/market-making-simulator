@@ -35,7 +35,7 @@ with open('results/markouts_dev.csv', 'w', newline='') as f:
 
 print('mean markout bp (before fees) at the headline: prorata (strawman: naive), 10 ms, 4 dev days pooled')
 print(f"{'arm':9s} {'source':8s} {'n':>7s} " + ' '.join(f'{h:>8s}' for _, h in H))
-for arm in ['s0', 's1', 's1t', 's2', 's3', 's3r', 'strawman']:
+for arm in ['s0', 's1', 's1t', 's2', 's3', 's3r', 's3m', 'strawman']:
     rule = 'naive' if arm == 'strawman' else 'prorata'
     for src in ('all', 'queue', 'through', 'cross'):
         cells = [acc.get((arm, rule, 10, src, h)) for _, h in H]

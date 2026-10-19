@@ -1,6 +1,7 @@
 // mm_sim.cpp - replay one .evt day through the exchange book and simulate
 // our maker orders on top of it. Strategies: S0 naive touch, and (Step 7a) the
-// GLFT arms S1 (Rule A) and S1t / S2 / S3 / S3r (Rule T), see mm/glft.hpp.
+// GLFT arms S1 (Rule A) and S1t / S2 / S3 / S3r / S3m (Rule T), see mm/glft.hpp.
+
 //
 // Tier A clock: ONE clock = the exchange timestamp (made non-decreasing),
 // zero feed latency. Order entry/response latency is real (half the round
@@ -26,11 +27,13 @@
 // The strategy only acts on market events, never on a response wake.
 //
 // GLFT arms (Step 7a): pass a params file as the 7th argument, one "key value"
-// per line: arm (s0|s1|s1t|s2|s3|s3r), gamma, sigma, A, k, kappa, seed and
+// per line: arm (s0|s1|s1t|s2|s3|s3r|s3m), gamma, sigma, A, k, kappa, seed and
 // g_tau (10 values, by best-level imbalance bin I = bid/(bid+ask)).
 //   alpha = sign * kappa * g_tau[bin(I)]: sign +1 for S2, -1 for S3, 0 for S1/S1t.
 //   S3r: a fresh coin flip (std::mt19937_64 seeded with `seed`) each time the
 //   imbalance bin changes, the only event that changes S3's alpha (Addendum A4).
+//   S3m (Addendum A5): a fresh coin flip only when the SIGN of g_tau[bin] changes, the only
+//   event that makes S3 swap which side leans back. So S3m swaps sides as often as S3.
 //   q = the position the strategy has HEARD about (lots). Q_max still applies.
 // inv_hist.csv: seconds spent at each |true position| (after burn-in, outside
 // funding). Used to choose gamma by the inventory rule, never by P&L.
@@ -92,7 +95,7 @@ static Lot qty_at(const ArrayBook& b, Side s, Tick px) {
     return 0;
 }
 
-enum class Arm { S0, S1, S1t, S2, S3, S3r };
+enum class Arm { S0, S1, S1t, S2, S3, S3r, S3m };
 
 struct Params {                        // the GLFT arms' inputs (all from config/calib_dev.json + gamma)
     Arm arm = Arm::S0;
@@ -112,7 +115,7 @@ static Params read_params(const std::string& path) {
             in >> P.arm_name;
             const std::string& a = P.arm_name;
             P.arm = a == "s0" ? Arm::S0 : a == "s1" ? Arm::S1 : a == "s1t" ? Arm::S1t : a == "s2" ? Arm::S2
-                  : a == "s3" ? Arm::S3 : a == "s3r" ? Arm::S3r : throw std::runtime_error("unknown arm " + a);
+                  : a == "s3" ? Arm::S3 : a == "s3r" ? Arm::S3r : a == "s3m" ? Arm::S3m : throw std::runtime_error("unknown arm " + a);
         } else if (key == "gamma") in >> P.gamma;
         else if (key == "sigma") in >> P.sigma;
         else if (key == "A") in >> P.A;
@@ -160,7 +163,8 @@ struct Sim {
     Glft g{0, 0};
     std::mt19937_64 rng;
     int last_bin = -1;                 // S3r: imbalance bin at the last decision
-    double coin = 1;                   // S3r: the current random sign
+    double coin = 1;                   // S3r / S3m: the current random sign
+    int last_sgn = 0;                  // S3m: sign of g_tau at the last decision
 
     Sim(QueueRule r, Ts e, Ts rs, Lot q, Ts d, std::FILE* fp, const Params& prm)
         : side{MakerSide(Side::Bid, r, e, rs), MakerSide(Side::Ask, r, e, rs)},
@@ -253,6 +257,10 @@ struct Sim {
         else if (P.arm == Arm::S3) sgn = -1;
         else if (P.arm == Arm::S3r) {                            // new flip only when S3 would re-decide
             if (bin != last_bin) { coin = (rng() & 1) ? 1 : -1; last_bin = bin; }
+            sgn = coin;
+        } else if (P.arm == Arm::S3m) {                     // new flip only when S3 would swap sides
+            const int sg = P.g_tau[bin] > 0 ? 1 : -1;
+            if (sg != last_sgn) { coin = (rng() & 1) ? 1 : -1; last_sgn = sg; }
             sgn = coin;
         }
         const double alpha = sgn * P.kappa * P.g_tau[bin];       // ticks; + = expect the mid to rise

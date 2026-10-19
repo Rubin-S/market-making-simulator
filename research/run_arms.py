@@ -1,10 +1,10 @@
 """Step 7: run every arm on the DEV days and check the P&L split adds up on every run.
 Grid (README + Addenda A1, A4):
-  arms     S0 naive touch, S1 GLFT (Rule A), S1t / S2 / S3 / S3r (Rule T)
+  arms     S0 naive touch, S1 GLFT (Rule A), S1t / S2 / S3 / S3r / S3m (Rule T; S3m = Addendum A5)
   rules    riskadverse (conservative bound), prorata (headline), power2 (optimistic bound)
   latency  0 / 10 / 50 ms round trip (10 = headline, 0 = physically impossible upper bound)
   + strawman: S0 under the naive trade-through fill rule, at the same 3 latencies
-  4 dev days each: 6 x 3 x 3 x 4 + 3 x 4 = 228 runs, JOBS at a time (default 4).
+  4 dev days each: 7 x 3 x 3 x 4 + 3 x 4 = 264 runs, JOBS at a time (default 4).
 gamma comes ONLY from config/gamma_dev.json (inventory rule); A and k match each run's rule and latency.
 Q_max = 10 stays ON here (it was lifted only to choose gamma).
 Outputs:
@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from arm_params import CALIB, write_params
 
 DEV = ['20260401', '20260501', '20260601', '20260701']
-ARMS = ['s0', 's1', 's1t', 's2', 's3', 's3r']
+ARMS = ['s0', 's1', 's1t', 's2', 's3', 's3r', 's3m']
 RULES = ['riskadverse', 'prorata', 'power2']
 LATS = [0, 10, 50]
 QMAX = 10
