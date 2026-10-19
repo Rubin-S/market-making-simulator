@@ -38,7 +38,11 @@
 // inv_hist.csv: seconds spent at each |true position| (after burn-in, outside
 // funding). Used to choose gamma by the inventory rule, never by P&L.
 //
-// Outputs in <out_dir>: fills.csv, orders.csv, events.csv, inv_hist.csv, summary.json.
+// Outputs in <out_dir>: fills.csv, orders.csv, events.csv, inv_hist.csv, pnl_min.csv, summary.json.
+// pnl_min.csv (Step 8): mark-to-market equity after fees (USDT) at t_start, at every whole UTC minute
+// after it, and at the data end (final mid). Row k minus row k-1 = the P&L of fills in [t_{k-1}, t_k)
+// plus the price move on the position held. The rows telescope exactly to the total P&L, which is
+// what the 5-minute moving-block bootstrap resamples (Addendum A6).
 // orders.csv (Step 6): one row per order we sent, with the book when we sent it
 // (own-side imbalance, size at our price, mid) and how it ended (fill/cancel/
 // reject/open). fills.csv carries the order_id so the two can be joined.
@@ -74,6 +78,8 @@ static constexpr Ts kHorizon[4] = {100'000, 1'000'000, 5'000'000, 30'000'000};  
 static constexpr int kTauLedger = 1;                            // P&L split uses tau = 1 s
 static constexpr Ts kFundingEvery = 8LL * 3600 * 1'000'000;     // Binance funding: 00:00, 08:00, 16:00 UTC
 static constexpr Ts kFundingMask = 30'000'000;                  // +-30 s around each one (pre-registered)
+static constexpr Ts kMinute = 60'000'000;                       // pnl_min.csv row spacing
+static constexpr double kMakerFee = 0.0002, kTakerFee = 0.0005; // VIP 0: 2 bp maker, 5 bp taker
 
 // True inside +-30 s of a funding time. Fills there are flagged, and the time
 // does not count as resting, so lambda = fills / resting time skips them both.
@@ -131,6 +137,7 @@ static Params read_params(const std::string& path) {
 }
 
 struct RawFill { FillEvent f; Half mid_before; double qp; Lot pos_after; std::uint64_t id; };
+struct MinRow { Ts t; double equity; Lot pos; Half mid; };
 
 // One order we sent. Ids run 1, 2, 3, ... so order `id` lives at orders[id - 1].
 struct OrderRec {
@@ -157,6 +164,10 @@ struct Sim {
     std::vector<RawFill> fills;
     std::vector<OrderRec> orders;
     std::map<Lot, Ts> inv_time;        // |true position| -> microseconds spent there
+    std::int64_t cash = 0;             // tick*lots, same as the Ledger (buying costs cash)
+    double fees = 0;                   // USDT, same sum in the same order as the Ledger
+    Ts next_min = 0;                   // next pnl_min.csv row time
+    std::vector<MinRow> minutes;
     MidSeries mids;
     std::FILE* ev_fp;
     Params P;
@@ -180,11 +191,17 @@ struct Sim {
     void record(const std::optional<FillEvent>& f, double qp) {
         if (!f) return;
         pos += sign(f->side) * f->qty;
+        cash -= sign(f->side) * f->px * f->qty;
+        fees += kMakerFee * f->px * f->qty * kUsdtPerTickLot;
         const std::uint64_t id = side[f->side == Side::Bid ? 0 : 1].slot().id;   // filled() keeps the id
         fills.push_back({*f, mid_before, qp, pos, id});
         unheard.push_back(*f);
         end_order(id, 'f', f->ts);
         log("fill", f->side, f->px, id);
+    }
+
+    double equity(Half mid) const {                              // = Ledger::equity, during the replay
+        return static_cast<double>(2 * cash + pos * mid) / 2.0 * kUsdtPerTickLot - fees;
     }
 
     void end_order(std::uint64_t id, char how, Ts ts) {
@@ -197,13 +214,21 @@ struct Sim {
 
     void before_event(const ArrayBook& b, const Event& e) {
         if (pending && e.ts_exch > t) { pending = false; act(b); }   // time t is over: act on its final book
+        while (t_first >= 0 && e.ts_exch >= next_min) {          // whole minutes passed: book their equity
+            minutes.push_back({next_min, equity(mid_now), pos, mid_now});
+            next_min += kMinute;
+        }
         if (t_first >= 0 && e.ts_exch > t && t >= t_start && !in_funding(t)) {   // time until this event
             for (int i = 0; i < 2; ++i)
                 if (side[i].slot().st == State::Resting) rest[i] += e.ts_exch - t;
             inv_time[pos < 0 ? -pos : pos] += e.ts_exch - t;
         }
         t = std::max(t, e.ts_exch);                              // non-decreasing exchange clock
-        if (t_first < 0) { t_first = t; t_start = t + kBurnIn; }
+        if (t_first < 0) {
+            t_first = t; t_start = t + kBurnIn;
+            next_min = (t_start / kMinute + 1) * kMinute;          // first whole UTC minute after the burn-in
+            minutes.push_back({t_start, 0.0, 0, 0});               // nothing can fill before t_start
+        }
         const Tick bb = b.best_bid().px, ba = b.best_ask().px;
         for (MakerSide& o : side) {
             while (o.next_msg_time() < t) {                      // strictly before: ties go to market
@@ -343,7 +368,7 @@ int main(int argc, char** argv) {
         // ---- markouts (as-of mid, horizons past the data end are dropped) + ledger ----
         const Ts t_end = sim.t;
         const Half M = sim.mid_now;
-        Ledger L(0.0002, 0.0005);                                // VIP 0: 2 bp maker, 5 bp taker
+        Ledger L(kMakerFee, kTakerFee);
         std::FILE* fp = std::fopen((out + "/fills.csv").c_str(), "w");
         std::fprintf(fp, "ts_exch_us,side,px_tick,qty_lot,src,qp_before,mid_before_half,"
                          "mid_100ms_half,mid_1s_half,mid_5s_half,mid_30s_half,pos_after,masked,order_id\n");
@@ -380,7 +405,13 @@ int main(int argc, char** argv) {
             if (o.t_new + kHorizon[2] <= t_end) std::fprintf(op, "%lld", (long long)*sim.mids.asof(o.t_new + kHorizon[2]));
             std::fprintf(op, ",%d\n", in_funding(o.t_new) ? 1 : 0);
         }
-        std::fclose(op);
+        // pnl_min.csv: the minute rows + a final row at the data end, marked at the final mid
+        sim.minutes.push_back({t_end, sim.equity(M), sim.pos, M});
+        std::FILE* mp = std::fopen((out + "/pnl_min.csv").c_str(), "w");
+        std::fprintf(mp, "t_us,equity_usdt,pos_lots,mid_half\n");
+        for (const MinRow& r : sim.minutes)
+            std::fprintf(mp, "%lld,%.12f,%lld,%lld\n", (long long)r.t, r.equity, (long long)r.pos, (long long)r.mid);
+        std::fclose(mp);
 
         // inv_hist.csv + the time-weighted 99th percentile of |position|
         std::FILE* ip = std::fopen((out + "/inv_hist.csv").c_str(), "w");
