@@ -1,0 +1,10 @@
+hypothesis,test,estimate,ci_lo,ci_hi,day_ci_lo,day_ci_hi,predicted,verdict,p_one_sided,note
+H-Q3e,S0 f* (bp),-0.5959,-0.6303,-0.5684,-0.6136,-0.5328,< 0,confirmed,0.0,
+H-Q4a,S2 - S0 net VIP-0 per fill (bp),0.0695,-0.4287,0.4805,-0.1641,0.3309,< 0,not confirmed,0.5865,
+H-Q4c(i),S3 - S3r net per fill (bp),0.0017,-0.1517,0.1512,-0.0811,0.0485,> 0.1,not confirmed,0.9025,
+H-Q4c(ii),S3 net VIP-0 per fill (bp),-2.9365,-3.0905,-2.7945,-3.1811,-2.7187,< 0,confirmed,0.0,
+H-Q4c(i)m,S3 - S3m net per fill (bp),-0.0443,-0.2037,0.1152,-0.1363,-0.0312,> 0.1,not confirmed,0.965,post-hoc control (Addendum A5)
+H-L1 s1,"cut(0->50 ms, USDT/h): s1 - S0",12.3424,11.0375,14.1113,4.1568,17.338,> 0,not testable,0.0,S1 never quotes (0 fills): not testable
+H-L1 s1t,"cut(0->50 ms, USDT/h): s1t - S0",0.1679,-0.1722,0.5568,-0.1221,0.6346,> 0,not confirmed,0.1455,
+H-L1 s2,"cut(0->50 ms, USDT/h): s2 - S0",10.3527,8.9919,12.1527,3.6411,14.9894,> 0,confirmed,0.0,
+H-L1 s3,"cut(0->50 ms, USDT/h): s3 - S0",1.5355,1.0897,2.0314,0.4684,2.4095,> 0,confirmed,0.0,

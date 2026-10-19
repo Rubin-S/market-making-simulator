@@ -1,0 +1,18 @@
+hypothesis,part_of,test,estimate,ci_lo,ci_hi,predicted,part_on_side,p_part,verdict,p_hyp,p_holm,note
+H-Q1a,H-Q1a,S0 fill rate (prorata),0.5587,0.5453,0.5722,"in [0.45, 0.65]",True,0.0,confirmed,0.0,0.0,
+H-Q1a,H-Q1a,fill rate riskadverse - power2,-0.0572,-0.0623,-0.0525,< 0,True,0.0,confirmed,0.0,0.0,
+H-Q1b,H-Q1b,imbalance slope of P(fill) (prorata),-0.4118,-0.4265,-0.3946,< 0,True,0.0,confirmed,0.0,0.0,
+H-Q3a,H-Q3a,S0 mean 1 s markout bp (prorata),-0.5937,-0.6274,-0.5662,< 0,True,0.0,confirmed,0.0,0.0,
+H-Q3b,H-Q3b,P(fill|r<0) - P(fill|r>0) (prorata),0.7703,0.7325,0.814,> 0.4,True,0.0,confirmed,0.0,0.0,
+H-Q3c,H-Q3c,large queue: front - back markout bp (prorata),0.5561,0.4674,0.6721,> 0,True,0.0,confirmed,0.0,0.0,all 4 rules agree
+H-Q3d,H-Q3d,max cell mean markout bp (9 cells n>=30),-0.378,-0.4108,-0.3427,< 0,True,0.0,confirmed,0.0,0.0,
+H-C1,H-C1,"k12 - 0.5 k01 (probes, prorata 10 ms)",-0.1414,-0.1527,-0.1282,< 0,True,0.0,confirmed,0.0,0.0,probe resting time spread evenly over minutes (probes rest almost all the time)
+H-Q3e,H-Q3e,S0 f* (bp),-0.5959,-0.6303,-0.5684,< 0,True,0.0,confirmed,0.0,0.0,
+H-Q4a,H-Q4a,S2 - S0 net VIP-0 per fill (bp),0.0695,-0.4287,0.4805,< 0,False,0.5865,not confirmed,0.5865,1.0,
+H-Q4c(i),H-Q4c,S3 - S3r net per fill (bp),0.0017,-0.1517,0.1512,> 0.1,False,0.9025,not confirmed,0.9025,1.0,
+H-Q4c(ii),H-Q4c,S3 net VIP-0 per fill (bp),-2.9365,-3.0905,-2.7945,< 0,True,0.0,not confirmed,0.9025,1.0,
+H-L1 s1t,H-L1,"cut(0->50 ms, USDT/h): s1t - S0",0.1679,-0.1722,0.5568,> 0,False,0.1455,not confirmed,0.1455,0.4365,
+H-L1 s2,H-L1,"cut(0->50 ms, USDT/h): s2 - S0",10.3527,8.9919,12.1527,> 0,True,0.0,not confirmed,0.1455,0.4365,
+H-L1 s3,H-L1,"cut(0->50 ms, USDT/h): s3 - S0",1.5355,1.0897,2.0314,> 0,True,0.0,not confirmed,0.1455,0.4365,
+H-L1 s1,not in Holm,"cut(0->50 ms, USDT/h): s1 - S0",12.3424,11.0375,14.1113,> 0,False,0.0,reported only,,,S1 never quotes (0 fills): not testable
+H-Q4c(i)m,not in Holm,S3 - S3m net per fill (bp),-0.0443,-0.2037,0.1152,> 0.1,False,0.965,reported only,,,post-hoc control (Addendum A5)
