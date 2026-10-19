@@ -1,0 +1,8 @@
+data
+*.evt
+*.csv.gz
+*.parquet
+.venv/
+__pycache__/
+build/
+engine/build/
