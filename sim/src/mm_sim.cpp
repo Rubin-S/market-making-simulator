@@ -11,7 +11,10 @@
 //                 at our price; remember the mid "just before".
 //   apply event:  the engine's replay() updates the book.
 //   on_book / on_trade: queue update + fill checks for both sides,
-//                 record the mid, then let the strategy act.
+//                 record the mid, and mark "the strategy wants to act".
+// The strategy acts ONCE per timestamp, on the finished book: when the next
+// event has a later timestamp (one exchange message can carry many levels,
+// and we must not quote off a half-applied message). Same as hftbacktest.
 //
 // S0 naive touch: keep 1 lot on the best bid and 1 lot on the best ask.
 // Cancel only when the touch moves (hysteresis keeps queue position).
@@ -93,7 +96,10 @@ struct Sim {
     }
 
     // ---- replay() callbacks ----
+    bool pending = false;              // events at time t happened; act once t is finished
+
     void before_event(const ArrayBook& b, const Event& e) {
+        if (pending && e.ts_exch > t) { pending = false; act(b); }   // time t is over: act on its final book
         t = std::max(t, e.ts_exch);                              // non-decreasing exchange clock
         if (t_first < 0) { t_first = t; t_start = t + kBurnIn; }
         const Tick bb = b.best_bid().px, ba = b.best_ask().px;
@@ -124,15 +130,15 @@ struct Sim {
             mid_now = bb.px + ba.px; have_mid = true;            // half ticks
             mids.push(t, mid_now);
         }
-        act(b);
+        pending = true;
     }
 
-    void on_trade(const ArrayBook& b, const Event& e) {
+    void on_trade(const ArrayBook& /*b*/, const Event& e) {
         for (MakerSide& o : side) {
             const double qp = o.queue().qp();
             record(o.on_trade(t, e.side, e.px, e.qty), qp);
         }
-        act(b);
+        pending = true;
     }
 
     // ---- S0 naive touch ----
