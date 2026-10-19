@@ -2,13 +2,153 @@
 
 A C++20 maker backtester for Binance BTCUSDT perpetuals, built on the verified L2 book from
 [l2-orderbook-replay](https://github.com/Rubin-S/l2-orderbook-replay) (pinned at `engine/`).
-It has been checked fill for fill against hftbacktest 2.4.4. Results come after the
-pre-registration below.
+Checked fill for fill against hftbacktest 2.4.4, then used for a pre-registered study with a
+one-shot holdout.
 
-**Status:** engine + oracle done. Research has not started.
-- `make test`: 4 C++ test programs pass.
-- `oracle/run_compat.py`: compat mode matches hftbacktest in **16/16 configs**, with identical fills and equity within 1e-11 USDT.
-- `oracle/run_own.py`: our own simulator reproduces **97.5-98.9%** of hftbacktest's fills in all 8 single-clock configs.
+**Headline.** On the holdout, every realistic quoting strategy loses money, even at Binance's best
+maker rebate (−0.5 bp). The touch strategy's break-even maker fee is **f\* = −0.60 bp [−0.63, −0.57]**:
+you'd have to be *paid* 0.6 bp per fill to break even. The only strategy that looks profitable is
+the strawman with naive fills (+0.38 bp per fill at the rebate). **Whether market making looks
+profitable is decided by the fill model, not the strategy.**
+
+- **8 of 11** pre-registered hypotheses confirmed on the holdout. The mechanics replicate; the one strategy edge seen on dev (S3, fading imbalance) does not.
+- Every run's P&L splits exactly into spread capture + markout + inventory − fees (198/198 holdout runs, 264/264 dev).
+- Honest post-mortem written before this section: [`POSTMORTEM.md`](POSTMORTEM.md).
+
+| | |
+|---|---|
+| Engine | `make test`: 4 C++ test programs pass. Compat mode matches hftbacktest in **16/16 configs** (identical fills, equity within 1e-11 USDT). Own mode reproduces **97.5–98.9%** of hftbacktest's fills. |
+| Data | Tardis free first-of-month files. Dev: Apr–Jul 2026 (8 h). Holdout: Aug 1, Sep 1, Oct 1 2026 (6 h), run once. **Each file covers 00:00–02:00 UTC only.** |
+| Tags | `prereg-v1` … `prereg-v1.5` (pre-registration + addenda), `freeze-v1` (52e6887), `holdout-v1` (d97f5b2), `v1.0` |
+
+## Results
+
+Headline settings throughout: Prorata queue rule, 10 ms round trip, exchange-time clock. Numbers in
+brackets are 95% CIs from a 5-minute moving-block bootstrap (2,000 resamples). "bp" = basis points
+of traded notional, per fill.
+
+### Q1. How much does the fill rule move the answer? A lot.
+
+![The fill model decides whether quoting the touch can pay](figures/fig1_fill_models.png)
+
+The same S0 quotes (1 lot at best bid and best ask) under four fill models:
+
+| Fill model | Break-even fee f\*, dev | f\*, holdout |
+|---|---|---|
+| RiskAdverse (conservative) | −0.85 | −0.67 |
+| **Prorata (headline)** | **−0.80** | **−0.60** |
+| Power2 (optimistic) | −0.75 | −0.55 |
+| Naive strawman | −0.17 | −0.09 |
+
+The three queue models stay within about 0.1 bp of each other, and all three sit below the −0.5 bp
+rebate. The naive model (fill whenever a trade prints at your price) gives about 4.5× as many fills
+and shrinks the break-even gap 4–7×, which is enough to make the strategy look profitable at the rebate.
+Holdout S0 fill rate is **0.559** [0.545, 0.572], inside the 45–65% that Albers et al. measured live.
+
+### Q3. How big is adverse selection? It's the whole story.
+
+![The simulator reproduces Albers et al.'s live Binance facts](figures/fig2_albers.png)
+
+| Holdout check | Result |
+|---|---|
+| Fill probability falls as your own side gets heavier (logit slope) | **−0.412** [−0.426, −0.395] |
+| Bid fills when the next 5 s go down, minus when they go up | **+0.770** [0.733, 0.814] |
+| Mean 1 s markout of a maker fill | **−0.594 bp** [−0.627, −0.566] |
+| Large queues: front-of-queue minus back-of-queue markout | **+0.556 bp**, same sign on all 4 rules |
+| Best queue-size × position cell | **−0.378 bp**: no cell makes money |
+
+You get filled mostly when the price is about to move through you. Every fill source (queue,
+trade-through, cross) loses at every horizon from 100 ms to 30 s, and trade-through fills are the worst.
+The simulator reproduces all of Albers et al.'s live Binance facts without being tuned to them.
+
+### Q5. What fee would each strategy break even at? Below every real tier.
+
+![No realistic arm breaks even, even at the best maker rebate](figures/fig3_breakeven_fee.png)
+
+| Arm (holdout) | f\* (bp) | Net per fill at −0.5 bp rebate |
+|---|---|---|
+| S0 touch | −0.60 [−0.63, −0.57] | −0.34 |
+| S1t GLFT (touch-anchored) | −0.65 | −0.39 |
+| S2 lean with imbalance | −0.69 | −0.27 |
+| S3 fade imbalance | −0.64 | −0.44 |
+| S3m random-direction control (same churn) | −0.64 | −0.39 |
+| S3r random-direction control | −0.72 | −0.44 |
+| Strawman (naive fills) | −0.09 | **+0.38** |
+
+f\* is spread capture + 1 s markout per fill, before fees. A strategy profits only if its maker fee is
+below f\*. Binance's best public maker rate is −0.5 bp, so no realistic arm clears it. At the retail VIP-0 fee (+2 bp), S0 loses 2.84 bp per fill.
+
+### Q4. Does skewing on order-book imbalance help? No.
+
+| Comparison (holdout, net bp per fill) | Dev | Holdout | Verdict |
+|---|---|---|---|
+| S3 (fade) − S3r (random direction), pre-registered | +0.181 [0.091, 0.258] | **+0.002** [−0.152, 0.151] | not confirmed |
+| S3 − S3m (random direction, same churn), post-hoc | +0.097 [−0.006, 0.204] | −0.044 [−0.204, 0.115] | no edge |
+| S2 (lean with) − S0 | −0.119 [−0.460, 0.276] | +0.070 [−0.429, 0.480] | too few fills to tell |
+
+The dev "edge" of S3 over S3r came mostly from S3r being a worse-run order manager: it flipped sides
+about 2.9× as often, so it kept losing its queue place. The churn-matched control S3m (added after
+dev, disclosed in Addendum A5) already shrank the edge to a CI touching zero, and on the holdout it
+is gone. S2 leans its quotes onto the heavy side, so it rarely fills (178 fills/h vs S0's 1,361);
+its CI is too wide to say anything.
+
+### Q2. Does GLFT inventory control help? Only as a cap.
+
+γ was chosen by risk alone (the smallest γ that keeps the 99th-percentile |position| ≤ 10 lots on dev),
+never by P&L: γ = 1e-6. At that γ, GLFT's skew is about 0.15 ticks per lot, far less than the one-tick
+spread, so it rarely moves a quote. Inventory is really controlled by the hard wall: the strategy stops
+quoting the side that would push |q| past about 9.7 lots. The literal GLFT rule (S1) never quotes at all,
+because Binance's queue intensity does not decay exponentially with distance (H-C1 confirmed:
+k12 − 0.5·k01 = −0.141 [−0.153, −0.128]). S1t (touch-anchored GLFT) breaks even at −0.65 bp, close to S0's −0.60.
+
+### Latency (H-L1): not confirmed, and the metric was flawed
+
+Going from 0 to 50 ms was predicted to hurt the cancel-using arms more than S0, in USDT per hour.
+On the holdout, S1t's extra cut was +0.168 USDT/h [−0.172, 0.557]: not confirmed. Per-hour P&L
+rewards trading less, so an arm that barely trades looks latency-proof (S1, with 0 fills, would
+"pass"). This weakness was written down before the holdout; v2 measures latency per fill.
+
+### All 11 hypotheses (holdout)
+
+| Hypothesis | Holdout | Verdict |
+|---|---|---|
+| H-Q1a fill rate in [0.45, 0.65], RiskAdverse < Power2 | 0.559; −0.057 | ✅ |
+| H-Q1b imbalance slope < 0 | −0.412 | ✅ |
+| H-Q3a 1 s markout < 0 | −0.594 bp | ✅ |
+| H-Q3b fill-direction gap ≥ 0.4 | 0.770 | ✅ |
+| H-Q3c large-queue front beats back (all 4 rules) | +0.556 bp | ✅ |
+| H-Q3d no positive cell | max −0.378 bp | ✅ |
+| H-Q3e S0 needs a rebate (f\* < 0) | −0.596 bp | ✅ |
+| H-Q4a S2 no better than S0 | +0.070 [−0.429, 0.480] | ❌ underpowered |
+| H-Q4c S3 beats S3r by > 0.1 bp, loses at VIP-0 | +0.002 [−0.152, 0.151] | ❌ |
+| H-L1 latency hurts cancel-users more | S1t +0.168 [−0.172, 0.557] | ❌ |
+| H-C1 queue intensity is not exponential | −0.141 | ✅ |
+
+Holm-adjusted p-values: 0 for every confirmed hypothesis, 1.000 for H-Q4a and H-Q4c, 0.436 for H-L1.
+
+### Limitations
+
+- **Asian session only.** Every file covers 00:00–02:00 UTC: 8 dev hours and 6 holdout hours. US/EU hours may differ.
+- **The holdout was quieter.** S0 traded about a third as many fills per hour as on dev, and lost less per fill (f\* −0.60 vs −0.80). Every confirmed direction held anyway.
+- **Simulated queue position.** Binance doesn't publish order-level data, so queue position comes from a probabilistic model. That's why four rules bracket the answer.
+- **1 lot, no market impact.** Our 0.001 BTC orders don't change the book. Larger size would likely do worse.
+- **S1t stands in for S1**, and S4 (reversal-gated) was not built in v1.
+
+### v2 (pre-registered in POSTMORTEM.md, new days only)
+Full 24 h days (Nov 2026 – Jan 2027), latency measured per fill, S4 reversal-gated arm, imbalance tested at 5 s and 30 s, and enough S2 hours for a useful CI.
+
+## Reproduce
+
+```bash
+git clone --recursive https://github.com/Rubin-S/market-making-simulator && cd market-making-simulator
+make && make test
+python -m venv .venv && .venv/bin/pip install -r requirements.txt
+# dev, in the order used in the study
+for s in run_probes calibrate albers choose_gamma run_arms markouts economics verdicts; do .venv/bin/python research/$s.py; done
+# holdout (refuses unless HEAD descends from freeze-v1 and the tree is clean)
+for s in run_probes albers run_arms markouts economics verdicts; do .venv/bin/python research/$s.py --holdout; done
+.venv/bin/python research/figures.py
+```
 
 ---
 
