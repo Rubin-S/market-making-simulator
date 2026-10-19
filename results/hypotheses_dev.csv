@@ -1,0 +1,10 @@
+hypothesis,test,estimate,ci_lo,ci_hi,day_ci_lo,day_ci_hi,predicted,dev_preview,p_one_sided,note
+H-Q3e,S0 f* (bp),-0.7975,-0.8437,-0.7565,-0.8582,-0.6347,< 0,on predicted side,0.0,
+H-Q4a,S2 - S0 net VIP-0 per fill (bp),-0.1187,-0.4603,0.2757,-0.1925,0.113,< 0,not shown,0.28,
+H-Q4c(i),S3 - S3r net per fill (bp),0.1812,0.0914,0.2577,0.1391,0.2125,> 0.1,not shown,0.037,
+H-Q4c(ii),S3 net VIP-0 per fill (bp),-3.0961,-3.1941,-2.9849,-3.157,-2.9976,< 0,on predicted side,0.0,
+H-Q4c(i)m,S3 - S3m net per fill (bp),0.0971,-0.0063,0.2042,0.0468,0.1994,> 0.1,not shown,0.517,post-hoc control (Addendum A5)
+H-L1 s1,"cut(0->50 ms, USDT/h): s1 - S0",35.0204,29.0774,42.9607,16.495,52.2565,> 0,not testable,0.0,S1 never quotes (0 fills): not testable
+H-L1 s1t,"cut(0->50 ms, USDT/h): s1t - S0",-0.1285,-0.5259,0.2737,-0.3909,0.1339,> 0,not shown,0.7205,
+H-L1 s2,"cut(0->50 ms, USDT/h): s2 - S0",29.1166,24.1273,35.3332,13.2122,42.6639,> 0,on predicted side,0.0,
+H-L1 s3,"cut(0->50 ms, USDT/h): s3 - S0",3.1636,2.2855,4.2699,1.2002,5.127,> 0,on predicted side,0.0,
