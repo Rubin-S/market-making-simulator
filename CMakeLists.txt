@@ -26,3 +26,7 @@ add_test(NAME fill COMMAND test_fill)
 add_executable(test_markout sim/tests/test_markout.cpp)
 target_link_libraries(test_markout PRIVATE mm)
 add_test(NAME markout COMMAND test_markout)
+
+# The simulator itself
+add_executable(mm_sim sim/src/mm_sim.cpp)
+target_link_libraries(mm_sim PRIVATE mm)
